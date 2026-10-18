@@ -563,11 +563,11 @@ function closeDetail(){
 
 
 // CALENDAR
-const TD={2026:{10:[4,11,18,25],11:[1,8,15,22,29],12:[6,13,20]}};
-const SP={'2026-11-01':8,'2026-11-08':12,'2026-11-15':0,'2026-11-22':5,'2026-11-29':12,'2026-12-06':10,'2026-12-13':3,'2026-12-20':12,'2026-10-04':0,'2026-10-11':0,'2026-10-18':0,'2026-10-25':10};
+const TD={2026:{9:[25],10:[1,8,15,22,29],11:[6,13,20]}};
+const SP={'2026-10-25':10,'2026-11-01':8,'2026-11-08':12,'2026-11-15':0,'2026-11-22':5,'2026-11-29':12,'2026-12-06':10,'2026-12-13':3,'2026-12-20':12};
 const MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DN=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-let cY=2026,cM=10,sel=null;
+let cY=2026,cM=9,sel=null;
 function p2(n){return String(n).padStart(2,'0')}
 function rCal(){
   document.getElementById('cal-ml').textContent=MN[cM]+' '+cY;
