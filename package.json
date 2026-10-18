@@ -1,0 +1,8 @@
+{
+  "name": "luxrun",
+  "version": "1.0.0",
+  "dependencies": {
+    "stripe": "^14.0.0",
+    "resend": "^2.0.0"
+  }
+}
