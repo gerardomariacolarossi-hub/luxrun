@@ -1,0 +1,105 @@
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const { Resend } = require('resend');
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+const AIRTABLE_TOKEN = process.env.AIRTABLE_TOKEN;
+const AIRTABLE_BASE = process.env.AIRTABLE_BASE_ID;
+
+module.exports = async (req, res) => {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const sig = req.headers['stripe-signature'];
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(
+      req.body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+  } catch (err) {
+    console.error('Webhook signature error:', err.message);
+    return res.status(400).json({ error: `Webhook Error: ${err.message}` });
+  }
+
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object;
+    const meta = session.metadata;
+
+    try {
+      await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE}/Participants`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${AIRTABLE_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fields: {
+            'Full Name': `${meta.firstName} ${meta.lastName}`,
+            'Email': meta.email,
+            'Tour Date': meta.date,
+            'Number of People': parseInt(meta.people),
+            'Food Allergies': meta.allergies,
+            'Earphone Rental': meta.earphones === 'true',
+            'Payment Confirmed': true,
+          },
+        }),
+      });
+    } catch (err) {
+      console.error('Airtable error:', err);
+    }
+
+    try {
+      await resend.emails.send({
+        from: 'LuxRun <onboarding@resend.dev>',
+        to: meta.email,
+        subject: 'Your LuxRun booking is confirmed!',
+        html: `
+          <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px">
+            <h1 style="font-size:24px;font-weight:700;margin-bottom:8px">You're in, ${meta.firstName}!</h1>
+            <p style="color:#555;line-height:1.7;margin-bottom:24px">Your spot on the Luxembourg City Running Tour is confirmed.</p>
+            <div style="background:#F7F6F1;border-radius:12px;padding:20px;margin-bottom:24px">
+              <p style="margin:0 0 8px"><strong>Date:</strong> ${meta.date}</p>
+              <p style="margin:0 0 8px"><strong>Time:</strong> ${meta.time}</p>
+              <p style="margin:0 0 8px"><strong>Participants:</strong> ${meta.people}</p>
+              <p style="margin:0 0 8px"><strong>Meeting point:</strong> Coque Sports Centre, Kirchberg</p>
+              ${meta.earphones === 'true' ? '<p style="margin:0"><strong>Earphones:</strong> Rental included</p>' : ''}
+            </div>
+            <p style="color:#555;line-height:1.7;margin-bottom:16px"><strong>Important:</strong> The day before your tour you will receive a separate email with your personal QR code. Download the app in advance — it works fully offline via GPS, no internet needed during the run.</p>
+            <p style="color:#999;font-size:13px">Free cancellation up to 24 hours before the tour. Reply to this email to cancel.</p>
+            <hr style="border:none;border-top:1px solid #E0E0E0;margin:24px 0">
+            <p style="color:#999;font-size:12px">2026 LuxRun. Luxembourg City.</p>
+          </div>
+        `,
+      });
+    } catch (err) {
+      console.error('Email error:', err);
+    }
+
+    try {
+      await resend.emails.send({
+        from: 'LuxRun <onboarding@resend.dev>',
+        to: process.env.ORGANIZER_EMAIL,
+        subject: `New booking — ${meta.date}`,
+        html: `
+          <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px">
+            <h2 style="font-size:20px;margin-bottom:16px">New booking received</h2>
+            <p><strong>Name:</strong> ${meta.firstName} ${meta.lastName}</p>
+            <p><strong>Email:</strong> ${meta.email}</p>
+            <p><strong>Date:</strong> ${meta.date} at ${meta.time}</p>
+            <p><strong>Participants:</strong> ${meta.people}</p>
+            <p><strong>Allergies:</strong> ${meta.allergies}</p>
+            <p><strong>Earphones:</strong> ${meta.earphones === 'true' ? 'Yes' : 'No'}</p>
+            <p><strong>Amount paid:</strong> EUR ${(session.amount_total / 100).toFixed(2)}</p>
+          </div>
+        `,
+      });
+    } catch (err) {
+      console.error('Organizer email error:', err);
+    }
+  }
+
+  res.status(200).json({ received: true });
+};
