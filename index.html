@@ -254,6 +254,26 @@ footer{background:var(--dark);padding:56px 36px 32px}
   .bring-grid{grid-template-columns:1fr 1fr}
   .sticky-book{bottom:16px;right:16px;padding:12px 20px;font-size:14px}
 }
+
+/* CANCEL SECTION */
+.cancel-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;padding:24px}
+.cancel-overlay.show{display:flex}
+.cancel-card{background:var(--white);border-radius:20px;padding:40px;max-width:440px;width:100%;text-align:center}
+.cancel-icon{font-size:44px;margin-bottom:20px}
+.cancel-card h2{font-family:var(--font-title);font-size:24px;font-weight:800;margin-bottom:8px;letter-spacing:-0.02em}
+.cancel-card .sub{font-size:15px;color:var(--muted);margin-bottom:24px;line-height:1.6}
+.cancel-details{background:var(--cream);border-radius:12px;padding:18px;margin-bottom:20px;text-align:left}
+.cancel-details p{font-size:14px;color:var(--ink2);margin-bottom:6px}
+.cancel-details p:last-child{margin-bottom:0}
+.cancel-warning{background:#FFF8E6;border:1px solid #F0D060;border-radius:12px;padding:14px;margin-bottom:20px;font-size:13px;color:#7A5F00;line-height:1.6;display:none}
+.btn-red{width:100%;background:#EF4444;color:#fff;border:none;padding:14px;border-radius:12px;font-size:16px;font-weight:600;font-family:var(--font-title);cursor:pointer;margin-bottom:10px;transition:background var(--ease)}
+.btn-red:hover{background:#DC2626}
+.btn-red:disabled{background:#ccc;cursor:default}
+.cancel-back{font-size:14px;color:var(--muted);text-decoration:none;cursor:pointer;background:none;border:none;font-family:var(--font-body)}
+.cancel-back:hover{color:var(--ink)}
+.cancel-success{display:none}
+.cancel-error{color:#EF4444;font-size:13px;margin-top:10px}
+
 </style>
 </head>
 <body>
@@ -684,6 +704,113 @@ FQ.forEach(f=>{
   fl.appendChild(it);
 });
 function tFaq(b){b.parentElement.classList.toggle('on')}
+</script>
+
+<div class="cancel-overlay" id="cancel-overlay">
+  <div class="cancel-card">
+    <div id="cancel-loading">
+      <div class="cancel-icon">⏳</div>
+      <h2>Loading...</h2>
+    </div>
+    <div id="cancel-content" style="display:none">
+      <div class="cancel-icon">⚠️</div>
+      <h2>Cancel your booking</h2>
+      <p class="sub">Are you sure? This action cannot be undone.</p>
+      <div class="cancel-details" id="cancel-details"></div>
+      <div class="cancel-warning" id="cancel-warning"></div>
+      <button class="btn-red" id="cancel-confirm-btn" onclick="confirmCancelBooking()">Yes, cancel my booking</button>
+      <button class="cancel-back" onclick="closeCancelOverlay()">No, keep my booking</button>
+      <p class="cancel-error" id="cancel-error"></p>
+    </div>
+    <div class="cancel-success" id="cancel-success">
+      <div class="cancel-icon">✅</div>
+      <h2>Booking cancelled</h2>
+      <p class="sub">Your refund has been processed and will appear on your statement within 5-10 business days.</p>
+      <button class="btn-lime" onclick="closeCancelOverlay()" style="margin-top:20px">Back to LuxRun</button>
+    </div>
+  </div>
+</div>
+
+<script>
+
+// CANCEL BOOKING
+let cancelToken = null;
+
+function closeCancelOverlay() {
+  document.getElementById('cancel-overlay').classList.remove('show');
+  // Remove token from URL
+  window.history.replaceState({}, '', '/');
+}
+
+async function loadCancelBooking(token) {
+  cancelToken = token;
+  document.getElementById('cancel-overlay').classList.add('show');
+
+  try {
+    const res = await fetch('/api/cancel?token=' + token + '&action=check');
+    const data = await res.json();
+
+    document.getElementById('cancel-loading').style.display = 'none';
+    document.getElementById('cancel-content').style.display = 'block';
+
+    if (!res.ok) {
+      document.getElementById('cancel-content').innerHTML = '<div class="cancel-icon">❌</div><h2>Not found</h2><p class="sub">' + (data.error || 'Booking not found.') + '</p><button class="cancel-back" onclick="closeCancelOverlay()">Close</button>';
+      return;
+    }
+
+    document.getElementById('cancel-details').innerHTML =
+      '<p><strong>Name:</strong> ' + data.name + '</p>' +
+      '<p><strong>Date:</strong> ' + data.date + '</p>' +
+      '<p><strong>Participants:</strong> ' + data.people + '</p>';
+
+    if (!data.canCancel) {
+      const w = document.getElementById('cancel-warning');
+      w.style.display = 'block';
+      w.textContent = 'This booking is less than 24 hours away and is no longer eligible for a free refund.';
+      const btn = document.getElementById('cancel-confirm-btn');
+      btn.disabled = true;
+      btn.textContent = 'Cancellation window expired';
+    }
+  } catch (err) {
+    document.getElementById('cancel-loading').innerHTML = '<div class="cancel-icon">❌</div><h2>Error</h2><p class="sub">Something went wrong. Please try again.</p>';
+  }
+}
+
+async function confirmCancelBooking() {
+  const btn = document.getElementById('cancel-confirm-btn');
+  btn.textContent = 'Processing...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: cancelToken, action: 'confirm' }),
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      document.getElementById('cancel-content').style.display = 'none';
+      document.getElementById('cancel-success').style.display = 'block';
+    } else {
+      document.getElementById('cancel-error').textContent = data.error || 'Something went wrong.';
+      btn.textContent = 'Yes, cancel my booking';
+      btn.disabled = false;
+    }
+  } catch (err) {
+    document.getElementById('cancel-error').textContent = 'Something went wrong. Please try again.';
+    btn.textContent = 'Yes, cancel my booking';
+    btn.disabled = false;
+  }
+}
+
+// Check URL for cancel token on page load
+const urlParams = new URLSearchParams(window.location.search);
+const cancelTokenParam = urlParams.get('cancel');
+if (cancelTokenParam) {
+  loadCancelBooking(cancelTokenParam);
+}
+
 </script>
 </body>
 </html>
