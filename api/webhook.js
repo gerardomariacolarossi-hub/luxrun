@@ -5,11 +5,12 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const AIRTABLE_TOKEN = process.env.AIRTABLE_TOKEN;
 const AIRTABLE_BASE = process.env.AIRTABLE_BASE_ID;
 
-export const config = {
+const config = {
   api: {
     bodyParser: false,
   },
 };
+module.exports.config = config;
 
 async function getRawBody(req) {
   return new Promise((resolve, reject) => {
