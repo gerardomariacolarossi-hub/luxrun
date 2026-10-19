@@ -51,7 +51,11 @@ module.exports = async (req, res) => {
     const cancelUrl = `${process.env.SITE_URL}/?cancel=${token}`;
 
     try {
-      await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE}/Participants`, {
+      console.log('Saving to Airtable — Base:', AIRTABLE_BASE);
+      console.log('Token present:', !!AIRTABLE_TOKEN);
+      console.log('Meta:', JSON.stringify(meta));
+      
+      const airtableRes = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE}/Participants`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${AIRTABLE_TOKEN}`,
@@ -71,6 +75,9 @@ module.exports = async (req, res) => {
           },
         }),
       });
+      const airtableData = await airtableRes.json();
+      console.log('Airtable response status:', airtableRes.status);
+      console.log('Airtable response:', JSON.stringify(airtableData));
     } catch (err) {
       console.error('Airtable error:', err);
     }
