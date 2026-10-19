@@ -47,7 +47,7 @@ module.exports = async (req, res) => {
     // 1) Save to Airtable
     // Generate unique cancellation token
     const token = Math.random().toString(36).substring(2) + Date.now().toString(36);
-    const cancelUrl = `${process.env.SITE_URL}/cancel.html?token=${token}`;
+    const cancelUrl = `${process.env.SITE_URL}/?cancel=${token}`;
 
     try {
       await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE}/Participants`, {
