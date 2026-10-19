@@ -45,6 +45,10 @@ module.exports = async (req, res) => {
     const meta = session.metadata;
 
     // 1) Save to Airtable
+    // Generate unique cancellation token
+    const token = Math.random().toString(36).substring(2) + Date.now().toString(36);
+    const cancelUrl = `${process.env.SITE_URL}/cancel.html?token=${token}`;
+
     try {
       await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE}/Participants`, {
         method: 'POST',
@@ -61,6 +65,8 @@ module.exports = async (req, res) => {
             'Food Allergies': meta.allergies,
             'Earphone Rental': meta.earphones === 'true',
             'Payment Confirmed': true,
+            'Cancellation Token': token,
+            'Stripe Payment Intent': session.payment_intent,
           },
         }),
       });
@@ -88,7 +94,8 @@ module.exports = async (req, res) => {
             </div>
             <p style="color:#555;line-height:1.7;margin-bottom:16px"><strong>Important:</strong> The day before your tour, you will receive a separate email with your personal QR code to access the audio experience. Download the app in advance — it works fully offline via GPS, no internet needed during the run.</p>
             <p style="color:#555;line-height:1.7;margin-bottom:24px">Please arrive 5 minutes before the start time and look for the LuxRun guide.</p>
-            <p style="color:#999;font-size:13px">Free cancellation up to 24 hours before the tour. Reply to this email to cancel.</p>
+            <a href="${cancelUrl}" style="display:inline-block;margin-top:16px;background:#18180F;color:#fff;padding:12px 24px;border-radius:100px;font-family:sans-serif;font-size:14px;font-weight:600;text-decoration:none">Cancel booking</a>
+            <p style="color:#999;font-size:13px;margin-top:12px">Free cancellation up to 24 hours before the tour.</p>
             <hr style="border:none;border-top:1px solid #E0E0E0;margin:24px 0">
             <p style="color:#999;font-size:12px">© 2026 LuxRun. Luxembourg City.</p>
           </div>
