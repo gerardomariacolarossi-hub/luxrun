@@ -16,6 +16,22 @@
       "dest": "/api/$1.js"
     },
     {
+      "src": "/cancel",
+      "dest": "/cancel.html"
+    },
+    {
+      "src": "/cancel.html",
+      "dest": "/cancel.html"
+    },
+    {
+      "src": "/success",
+      "dest": "/success.html"
+    },
+    {
+      "src": "/success.html",
+      "dest": "/success.html"
+    },
+    {
       "src": "/(.*)",
       "dest": "/$1"
     }
