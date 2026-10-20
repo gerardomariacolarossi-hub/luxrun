@@ -130,11 +130,11 @@ module.exports = async (req, res) => {
       const cleanDate3 = dateStr3.replace(/^[A-Za-z]+,\s*/, '').replace(' at ', ' ').trim();
       const dateOnly = new Date(cleanDate3).toISOString().split('T')[0];
       const sessionRes = await fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE}/Sessions?filterByFormula={Date}="${dateOnly}"`,
+        `https://api.airtable.com/v0/${AIRTABLE_BASE}/Sessions`,
         { headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` } }
       );
       const sessionData = await sessionRes.json();
-      const sess = sessionData.records?.[0];
+      const sess = sessionData.records?.find(r => r.fields['Date'] === dateOnly);
       if (sess) {
         const currentBooked = sess.fields['Booked Spots'] || 0;
         await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE}/Sessions/${sess.id}`, {
