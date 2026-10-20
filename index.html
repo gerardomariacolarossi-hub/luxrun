@@ -455,7 +455,7 @@ footer{background:var(--dark);padding:56px 36px 32px}
       <div class="fg"><label>Email address</label><input type="email" placeholder="mario@email.com"></div>
       <div class="fgrow">
         <div class="fg"><label>Participants</label><select id="np" onchange="updT()"><option value="1">1 person</option><option value="2">2 people</option><option value="3">3 people</option><option value="4">4 people</option></select></div>
-        <div class="fg"><label>Food allergies</label><select><option>None</option><option>Nut allergy</option><option>Gluten intolerance</option><option>Lactose intolerance</option><option>Other</option></select></div>
+        <div class="fg"><label>Food allergies</label><select id="allergies-select"><option value="None">None</option><option value="Nut allergy">Nut allergy</option><option value="Gluten intolerance">Gluten intolerance</option><option value="Lactose intolerance">Lactose intolerance</option><option value="Other">Other</option></select></div>
       </div>
       <div class="ear-row">
         <input type="checkbox" id="ears" onchange="updT()">
@@ -639,7 +639,7 @@ async function doPay(){
   const firstName = document.querySelector('input[placeholder="Mario"]').value;
   const lastName = document.querySelector('input[placeholder="Rossi"]').value;
   const email = document.querySelector('input[type="email"]').value;
-  const allergies = document.querySelector('select:last-of-type').value;
+  const allergies = document.getElementById('allergies-select').value;
 
   if (!firstName || !lastName || !email || !sel) {
     alert('Please fill in all fields and select a date.');
