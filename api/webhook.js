@@ -59,8 +59,13 @@ module.exports = async (req, res) => {
 
   try {
     // Step 1: Find session in Airtable
+    // Try fetching ALL sessions to see what dates look like
+    const allSessions = await airtableFetch('/Sessions');
+    console.log('All sessions:', JSON.stringify(allSessions.records?.map(r => ({id: r.id, date: r.fields['Date']}))));
+    
     const formula = encodeURIComponent(`{Date}="${sessionDate}"`);
     const sessionData = await airtableFetch(`/Sessions?filterByFormula=${formula}`);
+    console.log('Session query result:', JSON.stringify(sessionData));
     const airtableSession = sessionData.records?.[0];
     console.log('Session found:', !!airtableSession, airtableSession?.id);
 
