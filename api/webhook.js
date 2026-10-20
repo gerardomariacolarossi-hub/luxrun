@@ -94,6 +94,8 @@ module.exports = async (req, res) => {
         sessionDate = sessionDate.split(' at ')[0].replace(/^[A-Za-z]+,\s*/, '').trim();
       }
       console.log('Looking for session date:', sessionDate);
+      const sessionUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE}/Sessions?filterByFormula={Date}="${sessionDate}"`;
+      console.log('Session URL:', sessionUrl);
       const sessionRes = await fetch(
         `https://api.airtable.com/v0/${AIRTABLE_BASE}/Sessions?filterByFormula={Date}="${sessionDate}"`,
         { headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` } }
