@@ -5,11 +5,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const AIRTABLE_TOKEN = process.env.AIRTABLE_TOKEN;
 const AIRTABLE_BASE = process.env.AIRTABLE_BASE_ID;
 
-const config = {
-  api: {
-    bodyParser: false,
-  },
-};
+const config = { api: { bodyParser: false } };
 module.exports.config = config;
 
 async function getRawBody(req) {
@@ -19,6 +15,18 @@ async function getRawBody(req) {
     req.on('end', () => resolve(Buffer.concat(chunks)));
     req.on('error', reject);
   });
+}
+
+async function airtableFetch(path, options = {}) {
+  const res = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE}${path}`, {
+    ...options,
+    headers: {
+      'Authorization': `Bearer ${AIRTABLE_TOKEN}`,
+      'Content-Type': 'application/json',
+      ...(options.headers || {}),
+    },
+  });
+  return res.json();
 }
 
 module.exports = async (req, res) => {
@@ -31,41 +39,41 @@ module.exports = async (req, res) => {
 
   try {
     const rawBody = await getRawBody(req);
-    event = stripe.webhooks.constructEvent(
-      rawBody,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET
-    );
+    event = stripe.webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
     console.error('Webhook signature error:', err.message);
     return res.status(400).json({ error: `Webhook Error: ${err.message}` });
   }
 
-  if (event.type === 'checkout.session.completed') {
-    const session = event.data.object;
-    const meta = session.metadata;
+  if (event.type !== 'checkout.session.completed') {
+    return res.status(200).json({ received: true });
+  }
 
-    // 1) Save to Airtable
-    // Generate unique cancellation token
-    const token = Math.random().toString(36).substring(2) + Date.now().toString(36);
-    const cancelUrl = `${process.env.SITE_URL}/?cancel=${token}`;
+  const session = event.data.object;
+  const meta = session.metadata;
+  const token = Math.random().toString(36).substring(2) + Date.now().toString(36);
+  const cancelUrl = `${process.env.SITE_URL}/?cancel=${token}`;
+  const sessionDate = meta.date; // Already ISO format "2026-11-01"
 
-    try {
-      console.log('Saving to Airtable — Base:', AIRTABLE_BASE);
-      console.log('Token present:', !!AIRTABLE_TOKEN);
-      console.log('Meta:', JSON.stringify(meta));
-      
-      const airtableRes = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE}/Participants`, {
+  console.log('Processing booking for:', sessionDate, meta.email);
+
+  try {
+    // Step 1: Find session in Airtable
+    const formula = encodeURIComponent(`{Date}="${sessionDate}"`);
+    const sessionData = await airtableFetch(`/Sessions?filterByFormula=${formula}`);
+    const airtableSession = sessionData.records?.[0];
+    console.log('Session found:', !!airtableSession, airtableSession?.id);
+
+    // Step 2: Save participant + update session spots in parallel
+    await Promise.all([
+      // Save participant
+      airtableFetch('/Participants', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${AIRTABLE_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           fields: {
             'Full Name': `${meta.firstName} ${meta.lastName}`,
             'Email': meta.email,
-            'Tour Date': meta.date,
+            'Tour Date': sessionDate,
             'Number of People': parseInt(meta.people),
             'Food Allergies': meta.allergies,
             'Earphone Rental': meta.earphones === 'true',
@@ -74,102 +82,71 @@ module.exports = async (req, res) => {
             'Stripe Payment Intent': session.payment_intent,
           },
         }),
-      });
-      const airtableData = await airtableRes.json();
-      console.log('Airtable response status:', airtableRes.status);
-      console.log('Airtable response:', JSON.stringify(airtableData));
-    } catch (err) {
-      console.error('Airtable error:', err);
-    }
+      }).then(d => console.log('Participant saved:', d.id || JSON.stringify(d))),
 
-    // Update Booked Spots in Sessions
-    try {
-      // Extract ISO date from meta.date (could be "2026-11-08" or text format)
-      let sessionDate = meta.date;
-      if (sessionDate.length === 10 && sessionDate.includes('-')) {
-        // Already ISO format
-      } else if (sessionDate.includes('T')) {
-        sessionDate = sessionDate.split('T')[0];
-      } else {
-        sessionDate = sessionDate.split(' at ')[0].replace(/^[A-Za-z]+,\s*/, '').trim();
-      }
-      console.log('Looking for session date:', sessionDate);
-      const sessionUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE}/Sessions?filterByFormula=${encodeURIComponent(`{Date}="${sessionDate}"`)}`;
-      console.log('Session URL:', sessionUrl);
-      const sessionRes = await fetch(sessionUrl, { headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` } });
-      const sessionData = await sessionRes.json();
-      const session = sessionData.records?.[0];
-      if (session) {
-        const currentBooked = session.fields['Booked Spots'] || 0;
-        await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE}/Sessions/${session.id}`, {
-          method: 'PATCH',
-          headers: {
-            Authorization: `Bearer ${AIRTABLE_TOKEN}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            fields: { 'Booked Spots': currentBooked + parseInt(meta.people) },
-          }),
-        });
-      }
-    } catch (err) {
-      console.error('Session update error:', err);
-    }
+      // Update booked spots
+      airtableSession
+        ? airtableFetch(`/Sessions/${airtableSession.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({
+              fields: {
+                'Booked Spots': (airtableSession.fields['Booked Spots'] || 0) + parseInt(meta.people),
+              },
+            }),
+          }).then(d => console.log('Session updated:', JSON.stringify(d.fields?.['Booked Spots'])))
+        : Promise.resolve(console.log('No session found for date:', sessionDate)),
+    ]);
 
-    // 2) Send confirmation email to participant
-    try {
-      await resend.emails.send({
+    // Step 3: Send both emails in parallel
+    await Promise.all([
+      resend.emails.send({
         from: 'LuxRun <onboarding@resend.dev>',
         to: meta.email,
         subject: 'Your LuxRun booking is confirmed!',
         html: `
           <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px">
-            <img src="https://luxrunv3-1.vercel.app/logo.png" alt="LuxRun" style="height:40px;margin-bottom:32px">
             <h1 style="font-size:24px;font-weight:700;margin-bottom:8px">You're in, ${meta.firstName}!</h1>
-            <p style="color:#555;line-height:1.7;margin-bottom:24px">Your spot on the Luxembourg City Running Tour is confirmed. Here are your details:</p>
+            <p style="color:#555;line-height:1.7;margin-bottom:24px">Your spot on the Luxembourg City Running Tour is confirmed.</p>
             <div style="background:#F7F6F1;border-radius:12px;padding:20px;margin-bottom:24px">
-              <p style="margin:0 0 8px"><strong>Date:</strong> ${meta.date}</p>
+              <p style="margin:0 0 8px"><strong>Date:</strong> ${sessionDate}</p>
               <p style="margin:0 0 8px"><strong>Time:</strong> ${meta.time}</p>
               <p style="margin:0 0 8px"><strong>Participants:</strong> ${meta.people}</p>
               <p style="margin:0 0 8px"><strong>Meeting point:</strong> Coque Sports Centre, Kirchberg</p>
               ${meta.earphones === 'true' ? '<p style="margin:0"><strong>Earphones:</strong> Rental included</p>' : ''}
             </div>
-            <p style="color:#555;line-height:1.7;margin-bottom:16px"><strong>Important:</strong> The day before your tour, you will receive a separate email with your personal QR code to access the audio experience. Download the app in advance — it works fully offline via GPS, no internet needed during the run.</p>
+            <p style="color:#555;line-height:1.7;margin-bottom:16px"><strong>Important:</strong> The day before your tour you will receive a separate email with your personal QR code. Download the app in advance — it works fully offline via GPS, no internet needed during the run.</p>
             <p style="color:#555;line-height:1.7;margin-bottom:24px">Please arrive 5 minutes before the start time and look for the LuxRun guide.</p>
             <a href="${cancelUrl}" style="display:inline-block;margin-top:16px;background:#18180F;color:#fff;padding:12px 24px;border-radius:100px;font-family:sans-serif;font-size:14px;font-weight:600;text-decoration:none">Cancel booking</a>
             <p style="color:#999;font-size:13px;margin-top:12px">Free cancellation up to 24 hours before the tour.</p>
             <hr style="border:none;border-top:1px solid #E0E0E0;margin:24px 0">
-            <p style="color:#999;font-size:12px">© 2026 LuxRun. Luxembourg City.</p>
+            <p style="color:#999;font-size:12px">2026 LuxRun. Luxembourg City.</p>
           </div>
         `,
-      });
-    } catch (err) {
-      console.error('Email error:', err);
-    }
+      }).catch(err => console.error('Participant email error:', err)),
 
-    // 3) Send notification email to organizer
-    try {
-      await resend.emails.send({
+      resend.emails.send({
         from: 'LuxRun <onboarding@resend.dev>',
         to: process.env.ORGANIZER_EMAIL,
-        subject: `New booking — ${meta.date}`,
+        subject: `New booking — ${sessionDate}`,
         html: `
           <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px">
             <h2 style="font-size:20px;margin-bottom:16px">New booking received</h2>
             <p><strong>Name:</strong> ${meta.firstName} ${meta.lastName}</p>
             <p><strong>Email:</strong> ${meta.email}</p>
-            <p><strong>Date:</strong> ${meta.date} at ${meta.time}</p>
+            <p><strong>Date:</strong> ${sessionDate} at ${meta.time}</p>
             <p><strong>Participants:</strong> ${meta.people}</p>
             <p><strong>Allergies:</strong> ${meta.allergies}</p>
             <p><strong>Earphones:</strong> ${meta.earphones === 'true' ? 'Yes' : 'No'}</p>
-            <p><strong>Amount paid:</strong> €${(session.amount_total / 100).toFixed(2)}</p>
+            <p><strong>Amount paid:</strong> EUR ${(session.amount_total / 100).toFixed(2)}</p>
           </div>
         `,
-      });
-    } catch (err) {
-      console.error('Organizer email error:', err);
-    }
+      }).catch(err => console.error('Organizer email error:', err)),
+    ]);
+
+    console.log('All done for booking:', meta.email);
+  } catch (err) {
+    console.error('Webhook processing error:', err);
   }
 
-  res.status(200).json({ received: true });
+  return res.status(200).json({ received: true });
 };
