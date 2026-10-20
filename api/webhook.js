@@ -59,14 +59,9 @@ module.exports = async (req, res) => {
 
   try {
     // Step 1: Find session in Airtable
-    // Try fetching ALL sessions to see what dates look like
+    // Fetch all sessions and filter client-side (Date field type doesn't support string formula)
     const allSessions = await airtableFetch('/Sessions');
-    console.log('All sessions:', JSON.stringify(allSessions.records?.map(r => ({id: r.id, date: r.fields['Date']}))));
-    
-    const formula = encodeURIComponent(`{Date}="${sessionDate}"`);
-    const sessionData = await airtableFetch(`/Sessions?filterByFormula=${formula}`);
-    console.log('Session query result:', JSON.stringify(sessionData));
-    const airtableSession = sessionData.records?.[0];
+    const airtableSession = allSessions.records?.find(r => r.fields['Date'] === sessionDate);
     console.log('Session found:', !!airtableSession, airtableSession?.id);
 
     // Step 2: Save participant + update session spots in parallel
