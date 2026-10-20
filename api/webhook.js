@@ -82,6 +82,31 @@ module.exports = async (req, res) => {
       console.error('Airtable error:', err);
     }
 
+    // Update Booked Spots in Sessions
+    try {
+      const sessionRes = await fetch(
+        `https://api.airtable.com/v0/${AIRTABLE_BASE}/Sessions?filterByFormula={Date}="${meta.date.split(' at ')[0].replace(/^[A-Za-z]+,\s*/, '').trim()}"`,
+        { headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` } }
+      );
+      const sessionData = await sessionRes.json();
+      const session = sessionData.records?.[0];
+      if (session) {
+        const currentBooked = session.fields['Booked Spots'] || 0;
+        await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE}/Sessions/${session.id}`, {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${AIRTABLE_TOKEN}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            fields: { 'Booked Spots': currentBooked + parseInt(meta.people) },
+          }),
+        });
+      }
+    } catch (err) {
+      console.error('Session update error:', err);
+    }
+
     // 2) Send confirmation email to participant
     try {
       await resend.emails.send({
