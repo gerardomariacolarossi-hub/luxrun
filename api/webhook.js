@@ -110,6 +110,18 @@ module.exports = async (req, res) => {
               ${meta.earphones === 'true' ? '<p style="margin:0"><strong>Earphones:</strong> Rental included</p>' : ''}
             </div>
             <p style="color:#555;line-height:1.7;margin-bottom:16px"><strong>Important:</strong> The day before your tour you will receive a separate email with your personal QR code. Download the app in advance — it works fully offline via GPS, no internet needed during the run.</p>
+            <div style="background:#F0FAE0;border-radius:12px;padding:18px;margin-bottom:20px;border:1px solid #C8E88A">
+              <p style="margin:0 0 6px;font-weight:600;color:#18180F">A post-run kit is waiting for you at the finish line.</p>
+              <p style="margin:0;font-size:14px;color:#3B3B30">We have prepared a little surprise to celebrate the end of your run. You will find it at Place de la Constitution.</p>
+            </div>
+            <div style="background:#F7F6F1;border-radius:12px;padding:18px;margin-bottom:20px">
+              <p style="margin:0 0 10px;font-weight:600;color:#18180F">What to bring:</p>
+              <p style="margin:0 0 4px;font-size:14px;color:#3B3B30">👟 Running shoes and comfortable sportswear</p>
+              <p style="margin:0 0 4px;font-size:14px;color:#3B3B30">🎧 Earphones — essential for the audio experience</p>
+              <p style="margin:0 0 4px;font-size:14px;color:#3B3B30">📱 Fully charged phone with the app set up in advance</p>
+              <p style="margin:0 0 4px;font-size:14px;color:#3B3B30">🧥 Visible or reflective sportswear</p>
+              <p style="margin:0;font-size:14px;color:#3B3B30">🔦 Headlamp if running in autumn or winter</p>
+            </div>
             <p style="color:#555;line-height:1.7;margin-bottom:24px">Please arrive 5 minutes before the start time and look for the LuxRun guide.</p>
             <a href="${cancelUrl}" style="display:inline-block;margin-top:16px;background:#18180F;color:#fff;padding:12px 24px;border-radius:100px;font-family:sans-serif;font-size:14px;font-weight:600;text-decoration:none">Cancel booking</a>
             <p style="color:#999;font-size:13px;margin-top:12px">Free cancellation up to 24 hours before the tour.</p>
