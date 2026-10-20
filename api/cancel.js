@@ -118,7 +118,39 @@ module.exports = async (req, res) => {
     }
 
     // Update Airtable
-    await updateBooking(booking.id, { 'Payment Confirmed': false });
+    // Delete the booking row from Airtable
+    await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE}/Participants/${booking.id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` },
+    });
+
+    // Decrement Booked Spots in Sessions
+    try {
+      const dateStr3 = booking.fields['Tour Date'];
+      const cleanDate3 = dateStr3.replace(/^[A-Za-z]+,\s*/, '').replace(' at ', ' ').trim();
+      const dateOnly = new Date(cleanDate3).toISOString().split('T')[0];
+      const sessionRes = await fetch(
+        `https://api.airtable.com/v0/${AIRTABLE_BASE}/Sessions?filterByFormula={Date}="${dateOnly}"`,
+        { headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` } }
+      );
+      const sessionData = await sessionRes.json();
+      const sess = sessionData.records?.[0];
+      if (sess) {
+        const currentBooked = sess.fields['Booked Spots'] || 0;
+        await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE}/Sessions/${sess.id}`, {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${AIRTABLE_TOKEN}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            fields: { 'Booked Spots': Math.max(0, currentBooked - (booking.fields['Number of People'] || 1)) },
+          }),
+        });
+      }
+    } catch (err) {
+      console.error('Session decrement error:', err);
+    }
 
     // Free up the spot
     await updateSessionSpots(booking.fields['Tour Date'], -1);
