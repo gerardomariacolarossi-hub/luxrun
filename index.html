@@ -583,12 +583,27 @@ function closeDetail(){
 
 
 
-// CALENDAR
-const TD={2026:{9:[25],10:[1,8,15,22,29],11:[6,13,20]}};
-const SP={'2026-10-25':10,'2026-11-01':10,'2026-11-08':12,'2026-11-15':0,'2026-11-22':5,'2026-11-29':12,'2026-12-06':10,'2026-12-13':3,'2026-12-20':12};
+// CALENDAR — reads from Airtable
 const MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DN=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-let cY=2026,cM=9,sel=null;
+let cY=new Date().getFullYear(),cM=new Date().getMonth(),sel=null;
+let sessionsData = {}; // {date: {spotsLeft, startTime}}
+
+async function loadSessions() {
+  try {
+    const res = await fetch('/api/sessions');
+    const data = await res.json();
+    sessionsData = {};
+    (data.sessions || []).forEach(s => {
+      sessionsData[s.date] = { spotsLeft: s.spotsLeft, startTime: s.startTime };
+    });
+    rCal();
+  } catch(err) {
+    console.error('Failed to load sessions:', err);
+    rCal();
+  }
+}
+
 function p2(n){return String(n).padStart(2,'0')}
 function rCal(){
   document.getElementById('cal-ml').textContent=MN[cM]+' '+cY;
@@ -596,7 +611,6 @@ function rCal(){
   const fd=new Date(cY,cM,1).getDay();
   const off=fd===0?6:fd-1;
   const dim=new Date(cY,cM+1,0).getDate();
-  const av=(TD[cY]||{})[cM]||[];
   const tod=new Date();
   for(let i=0;i<off;i++){const e=document.createElement('div');e.className='cc';g.appendChild(e)}
   for(let d=1;d<=dim;d++){
@@ -604,19 +618,19 @@ function rCal(){
     const k=cY+'-'+p2(cM+1)+'-'+p2(d);
     const dt=new Date(cY,cM,d);
     const past=dt<new Date(tod.getFullYear(),tod.getMonth(),tod.getDate());
-    const isAv=av.includes(d);
-    const sp=SP[k]||0;
+    const session=sessionsData[k];
     if(past){el.className='cc pa'}
-    else if(isAv&&sp>0){el.className=sel===k?'cc sel':'cc av';el.onclick=()=>selDate(d,k,sp)}
-    else if(isAv&&sp===0){el.className='cc fu'}
+    else if(session&&session.spotsLeft>0){el.className=sel===k?'cc sel':'cc av';el.onclick=()=>selDate(d,k,session.spotsLeft,session.startTime)}
+    else if(session&&session.spotsLeft<=0){el.className='cc fu'}
     else{el.className='cc'}
     el.textContent=d;g.appendChild(el);
   }
 }
-function selDate(d,k,sp){
+function selDate(d,k,sp,startTime){
   sel=k;rCal();
   const dt=new Date(cY,cM,d);
-  document.getElementById('bform-date').textContent=DN[dt.getDay()]+', '+d+' '+MN[cM]+' '+cY+' at 10:00';
+  const timeStr=startTime||'10:00';
+  document.getElementById('bform-date').textContent=DN[dt.getDay()]+', '+d+' '+MN[cM]+' '+cY+' at '+timeStr;
   document.getElementById('bform-spots').textContent=sp+' spot'+(sp!==1?'s':'')+' remaining';
   const f=document.getElementById('bform');f.classList.add('on');
   setTimeout(()=>f.scrollIntoView({behavior:'smooth',block:'nearest'}),40);
@@ -682,7 +696,7 @@ function toggleOther(sel) {
   wrap.style.display = sel.value === 'Other' ? 'block' : 'none';
 }
 
-rCal();
+loadSessions();
 
 // GALLERY
 let gI=0;
