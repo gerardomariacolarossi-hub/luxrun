@@ -630,6 +630,8 @@ function selDate(d,k,sp,startTime){
   sel=k;rCal();
   const dt=new Date(cY,cM,d);
   const timeStr=startTime||'10:00';
+  // Store the ISO date key for the API
+  document.getElementById('bform-date').dataset.isoDate = k;
   document.getElementById('bform-date').textContent=DN[dt.getDay()]+', '+d+' '+MN[cM]+' '+cY+' at '+timeStr;
   document.getElementById('bform-spots').textContent=sp+' spot'+(sp!==1?'s':'')+' remaining';
   const f=document.getElementById('bform');f.classList.add('on');
@@ -669,7 +671,7 @@ async function doPay(){
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        date: document.getElementById('bform-date').textContent,
+        date: document.getElementById('bform-date').dataset.isoDate || document.getElementById('bform-date').textContent,
         time: '10:00',
         people,
         earphones,
