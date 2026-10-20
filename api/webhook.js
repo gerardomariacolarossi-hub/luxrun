@@ -84,8 +84,18 @@ module.exports = async (req, res) => {
 
     // Update Booked Spots in Sessions
     try {
+      // Extract ISO date from meta.date (could be "2026-11-08" or text format)
+      let sessionDate = meta.date;
+      if (sessionDate.length === 10 && sessionDate.includes('-')) {
+        // Already ISO format
+      } else if (sessionDate.includes('T')) {
+        sessionDate = sessionDate.split('T')[0];
+      } else {
+        sessionDate = sessionDate.split(' at ')[0].replace(/^[A-Za-z]+,\s*/, '').trim();
+      }
+      console.log('Looking for session date:', sessionDate);
       const sessionRes = await fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE}/Sessions?filterByFormula={Date}="${meta.date.split(' at ')[0].replace(/^[A-Za-z]+,\s*/, '').trim()}"`,
+        `https://api.airtable.com/v0/${AIRTABLE_BASE}/Sessions?filterByFormula={Date}="${sessionDate}"`,
         { headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` } }
       );
       const sessionData = await sessionRes.json();
