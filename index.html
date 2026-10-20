@@ -455,7 +455,8 @@ footer{background:var(--dark);padding:56px 36px 32px}
       <div class="fg"><label>Email address</label><input type="email" placeholder="mario@email.com"></div>
       <div class="fgrow">
         <div class="fg"><label>Participants</label><select id="np" onchange="updT()"><option value="1">1 person</option><option value="2">2 people</option><option value="3">3 people</option><option value="4">4 people</option></select></div>
-        <div class="fg"><label>Food allergies</label><select id="allergies-select"><option value="None">None</option><option value="Nut allergy">Nut allergy</option><option value="Gluten intolerance">Gluten intolerance</option><option value="Lactose intolerance">Lactose intolerance</option><option value="Other">Other</option></select></div>
+        <div class="fg"><label>Food allergies</label><select id="allergies-select" onchange="toggleOther(this)"><option value="None">None</option><option value="Nut allergy">Nut allergy</option><option value="Gluten intolerance">Gluten intolerance</option><option value="Lactose intolerance">Lactose intolerance</option><option value="Other">Other (please specify)</option></select></div>
+<div class="fg" id="other-allergy-wrap" style="display:none"><label>Please specify</label><input type="text" id="other-allergy" placeholder="Describe your allergy or intolerance"></div>
       </div>
       <div class="ear-row">
         <input type="checkbox" id="ears" onchange="updT()">
@@ -584,7 +585,7 @@ function closeDetail(){
 
 // CALENDAR
 const TD={2026:{9:[25],10:[1,8,15,22,29],11:[6,13,20]}};
-const SP={'2026-10-25':10,'2026-11-01':8,'2026-11-08':12,'2026-11-15':0,'2026-11-22':5,'2026-11-29':12,'2026-12-06':10,'2026-12-13':3,'2026-12-20':12};
+const SP={'2026-10-25':10,'2026-11-01':10,'2026-11-08':12,'2026-11-15':0,'2026-11-22':5,'2026-11-29':12,'2026-12-06':10,'2026-12-13':3,'2026-12-20':12};
 const MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DN=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 let cY=2026,cM=9,sel=null;
@@ -639,7 +640,8 @@ async function doPay(){
   const firstName = document.querySelector('input[placeholder="Mario"]').value;
   const lastName = document.querySelector('input[placeholder="Rossi"]').value;
   const email = document.querySelector('input[type="email"]').value;
-  const allergies = document.getElementById('allergies-select').value;
+  const allergiesSelect = document.getElementById('allergies-select').value;
+  const allergies = allergiesSelect === 'Other' ? (document.getElementById('other-allergy').value || 'Other') : allergiesSelect;
 
   if (!firstName || !lastName || !email || !sel) {
     alert('Please fill in all fields and select a date.');
@@ -675,6 +677,11 @@ async function doPay(){
     btn.disabled = false;
   }
 }
+function toggleOther(sel) {
+  const wrap = document.getElementById('other-allergy-wrap');
+  wrap.style.display = sel.value === 'Other' ? 'block' : 'none';
+}
+
 rCal();
 
 // GALLERY
