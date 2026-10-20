@@ -55,14 +55,12 @@ module.exports = async (req, res) => {
   const cancelUrl = `${process.env.SITE_URL}/?cancel=${token}`;
   const sessionDate = meta.date; // Already ISO format "2026-11-01"
 
-  console.log('Processing booking for:', sessionDate, meta.email);
 
   try {
     // Step 1: Find session in Airtable
     // Fetch all sessions and filter client-side (Date field type doesn't support string formula)
     const allSessions = await airtableFetch('/Sessions');
     const airtableSession = allSessions.records?.find(r => r.fields['Date'] === sessionDate);
-    console.log('Session found:', !!airtableSession, airtableSession?.id);
 
     // Step 2: Save participant + update session spots in parallel
     await Promise.all([
@@ -82,7 +80,6 @@ module.exports = async (req, res) => {
             'Stripe Payment Intent': session.payment_intent,
           },
         }),
-      }).then(d => console.log('Participant saved:', d.id || JSON.stringify(d))),
 
       // Update booked spots
       airtableSession
@@ -93,8 +90,6 @@ module.exports = async (req, res) => {
                 'Booked Spots': (airtableSession.fields['Booked Spots'] || 0) + parseInt(meta.people),
               },
             }),
-          }).then(d => console.log('Session updated:', JSON.stringify(d.fields?.['Booked Spots'])))
-        : Promise.resolve(console.log('No session found for date:', sessionDate)),
     ]);
 
     // Step 3: Send both emails in parallel
@@ -143,7 +138,6 @@ module.exports = async (req, res) => {
       }).catch(err => console.error('Organizer email error:', err)),
     ]);
 
-    console.log('All done for booking:', meta.email);
   } catch (err) {
     console.error('Webhook processing error:', err);
   }
