@@ -16,6 +16,13 @@ async function getRawBody(req) {
   });
 }
 
+function wallTime(v) {
+  // Airtable returns Start Time as a full date-time (e.g. 2026-11-08T10:00:00.000Z).
+  // The digits are the time typed in Airtable (the field is kept in GMT), so we just keep HH:MM.
+  const m = String(v || '').match(/(\d{1,2}):(\d{2})/);
+  return m ? m[1].padStart(2, '0') + ':' + m[2] : '10:00';
+}
+
 async function airtableFetch(path, options = {}) {
   const res = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE}${path}`, {
     ...options,
@@ -28,14 +35,14 @@ async function airtableFetch(path, options = {}) {
   return res.json();
 }
 
-function confirmationEmail(meta, sessionDate, cancelUrl) {
+function confirmationEmail(meta, sessionDate, time, cancelUrl) {
   return `
     <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px">
       <h1 style="font-size:24px;font-weight:700;margin-bottom:8px">You're in, ${meta.firstName}!</h1>
       <p style="color:#555;line-height:1.7;margin-bottom:24px">Your spot on the Luxembourg City Running Tour is confirmed.</p>
       <div style="background:#F7F6F1;border-radius:12px;padding:20px;margin-bottom:24px">
         <p style="margin:0 0 8px"><strong>Date:</strong> ${sessionDate}</p>
-        <p style="margin:0 0 8px"><strong>Time:</strong> ${meta.time}</p>
+        <p style="margin:0 0 8px"><strong>Time:</strong> ${time}</p>
         <p style="margin:0 0 8px"><strong>Participants:</strong> ${meta.people}</p>
         <p style="margin:0 0 8px"><strong>Start:</strong> Coque Sports Centre, Kirchberg (<a href="https://www.google.com/maps/search/?api=1&query=49.624222,6.15575" style="color:#18180F">open in Maps</a>)</p>
         <p style="margin:0 0 8px"><strong>Finish:</strong> Place de la Constitution (<a href="https://www.google.com/maps/search/?api=1&query=49.608972,6.129194" style="color:#18180F">open in Maps</a>)</p>
@@ -90,6 +97,7 @@ module.exports = async (req, res) => {
   try {
     const allSessions = await airtableFetch('/Sessions');
     const airtableSession = allSessions.records?.find((r) => r.fields['Date'] === sessionDate);
+    const time = airtableSession ? wallTime(airtableSession.fields['Start Time']) : (meta.time || '10:00');
 
     const saveParticipant = airtableFetch('/Participants', {
       method: 'POST',
@@ -127,7 +135,7 @@ module.exports = async (req, res) => {
           from: 'LuxRun <onboarding@resend.dev>',
           to: meta.email,
           subject: 'Your LuxRun booking is confirmed!',
-          html: confirmationEmail(meta, sessionDate, cancelUrl),
+          html: confirmationEmail(meta, sessionDate, time, cancelUrl),
         })
         .catch((err) => console.error('Participant email error:', err)),
       resend.emails
@@ -140,7 +148,7 @@ module.exports = async (req, res) => {
               <h2 style="font-size:20px;margin-bottom:16px">New booking received</h2>
               <p><strong>Name:</strong> ${meta.firstName} ${meta.lastName}</p>
               <p><strong>Email:</strong> ${meta.email}</p>
-              <p><strong>Date:</strong> ${sessionDate} at ${meta.time}</p>
+              <p><strong>Date:</strong> ${sessionDate} at ${time}</p>
               <p><strong>Participants:</strong> ${meta.people}</p>
               <p><strong>Allergies:</strong> ${meta.allergies}</p>
               <p><strong>Earphones:</strong> ${meta.earphones === 'true' ? 'Yes' : 'No'}</p>
