@@ -687,10 +687,12 @@ function rCal(){
     el.textContent=d;g.appendChild(el);
   }
 }
+function fmtTime(v){const m=String(v||'').match(/(\d{1,2}):(\d{2})/);return m?m[1].padStart(2,'0')+':'+m[2]:'10:00'}
 function selDate(d,k,sp,startTime){
   sel=k;rCal();
   const dt=new Date(cY,cM,d);
-  const timeStr=startTime||'10:00';
+  const timeStr=fmtTime(startTime);
+  document.getElementById('bform-date').dataset.time = timeStr;
   // Store the ISO date key for the API
   document.getElementById('bform-date').dataset.isoDate = k;
   document.getElementById('bform-date').textContent=DN[dt.getDay()]+', '+d+' '+MN[cM]+' '+cY+' at '+timeStr;
@@ -733,7 +735,7 @@ async function doPay(){
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         date: document.getElementById('bform-date').dataset.isoDate || document.getElementById('bform-date').textContent,
-        time: '10:00',
+        time: document.getElementById('bform-date').dataset.time || '10:00',
         people,
         earphones,
         firstName,
@@ -845,7 +847,7 @@ async function loadCancelBooking(token) {
 
     document.getElementById('cancel-details').innerHTML =
       '<p><strong>Name:</strong> ' + data.name + '</p>' +
-      '<p><strong>Date:</strong> ' + data.date + '</p>' +
+      '<p><strong>Date:</strong> ' + data.date + (data.time ? ' at ' + data.time : '') + '</p>' +
       '<p><strong>Participants:</strong> ' + data.people + '</p>';
 
     if (!data.canCancel) {
